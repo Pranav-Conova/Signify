@@ -1,0 +1,652 @@
+{% load static %}
+<!DOCTYPE html>
+
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Hand Gesture Control for Presentations</title>
+    <style>
+      @import url("https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&family=Press+Start+2P&display=swap");
+
+      body {
+        font-family: "Roboto", sans-serif;
+        margin: 0;
+        padding: 0;
+        background-color: rgb(0, 0, 0);
+        color: #eee;
+        overflow-x: hidden;
+      }
+      .gesture-container {
+        margin: 1rem 0;
+        display: flex;
+        flex-direction: row;
+        align-items: center;
+        justify-content: center;
+        margin: 1rem 0;
+        padding: 0.5rem;
+        background: rgba(255, 215, 0, 0.1);
+        border-radius: 10px;
+      }
+
+      .camera-container label {
+        min-width: 100px; /* Ensures labels have uniform width */
+        text-align: left;
+        color: #ffffff;
+        text-decoration: none;
+        font-family: "Press Start 2P", cursive;
+        font-size: 10px;
+
+        font-weight: bold;
+        margin-bottom: 0.5rem;
+      }
+
+      .camera-container {
+        display: flex;
+        flex-direction: row;
+        align-items: center;
+        justify-content: center;
+        background: rgba(255, 215, 0, 0.1);
+        border-radius: 10px;
+        width: 100%;
+        margin: 0 0 0.5rem 0;
+        padding: 0.5rem;
+      }
+
+      .gesture-container label {
+        min-width: 100px; /* Ensures labels have uniform width */
+        text-align: left;
+        color: #ffffff;
+        text-decoration: none;
+        font-family: "Press Start 2P", cursive;
+        font-size: 10px;
+
+        font-weight: bold;
+        margin-bottom: 0.5rem;
+      }
+
+      label {
+        font-weight: bold;
+        display: block;
+        margin-bottom: 5px;
+      }
+      .checkbox-group {
+        display: flex;
+        gap: 10px;
+      }
+      #particles {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        pointer-events: none;
+        z-index: -1;
+      }
+
+      header {
+        background-color: rgba(0, 0, 0, 0.7);
+        padding: 1rem 2rem;
+        text-align: center;
+        color: #ffd700;
+      }
+
+      header .logo {
+        max-width: 150px;
+        margin: 0 auto;
+        display: block;
+        filter: drop-shadow(0 0 10px #ffd700);
+      }
+
+      header h1 {
+        font-family: "Press Start 2P", cursive;
+        margin-top: 1rem;
+        text-shadow: 2px 2px 5px #000;
+      }
+
+      nav {
+        display: flex;
+        justify-content: center;
+        background-color: rgba(0, 0, 0, 0.8);
+        padding: 1rem 0;
+        position: sticky;
+        top: 0;
+        z-index: 10;
+      }
+
+      nav a {
+        color: #ffd700;
+        text-decoration: none;
+        font-family: "Press Start 2P", cursive;
+        margin: 0 1rem;
+        transition: transform 0.3s;
+      }
+
+      nav a:hover {
+        transform: scale(1.2);
+      }
+
+      main {
+        padding: 2rem;
+      }
+
+      .section {
+        background: rgba(0, 0, 0, 0.9);
+        margin: 2rem auto;
+        padding: 2rem;
+        border-radius: 15px;
+        box-shadow: 0 4px 20px rgba(255, 215, 0, 0.5);
+        width: 80%;
+        position: relative;
+        overflow: hidden;
+        border: 2px solid transparent;
+        background-clip: padding-box;
+        transition: transform 0.3s, border-color 0.3s;
+      }
+
+      .section h2 {
+        font-family: "Press Start 2P", cursive;
+        color: #ffd700;
+        text-align: center;
+      }
+
+      .section::before {
+        content: "";
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: linear-gradient(
+          45deg,
+          rgba(255, 69, 0, 0.8),
+          rgba(255, 215, 0, 0.8)
+        );
+        opacity: 0.15;
+        z-index: -1;
+        filter: blur(10px);
+      }
+
+      .section:hover {
+        transform: scale(1.02);
+        border-color: #ffd700;
+        box-shadow: 0 6px 30px rgba(255, 215, 0, 0.7);
+      }
+
+      .section-content {
+        position: relative;
+        z-index: 1;
+        text-align: center;
+      }
+
+      footer {
+        background-color: rgba(0, 0, 0, 0.8);
+        color: #ffd700;
+        text-align: center;
+        padding: 1rem;
+        font-family: "Press Start 2P", cursive;
+      }
+
+      .btn {
+        display: inline-block;
+        font-family: "Press Start 2P", cursive;
+        background: linear-gradient(to right, #ffd700, #ff4500);
+        color: #000;
+        padding: 1rem 2rem;
+        border: none;
+        border-radius: 25px;
+        cursor: pointer;
+        font-size: 1rem;
+        text-align: center;
+        text-transform: uppercase;
+        transition: transform 0.3s, box-shadow 0.3s;
+      }
+
+      .btn:hover {
+        transform: scale(1.1);
+        box-shadow: 0 6px 15px rgba(255, 69, 0, 0.7);
+      }
+      .overlay {
+        display: none;
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.9); /* Changed to black */
+        backdrop-filter: blur(5px);
+        z-index: 1000;
+        align-items: center;
+        justify-content: center;
+        animation: fadeIn 0.3s ease-in-out;
+      }
+
+      .overlay h2 {
+        font-family: "Press Start 2P", cursive;
+        color: #ffd700;
+        text-align: center;
+        font-size: 18px;
+      }
+
+      .overlay-content {
+        background: black; /* Set the overlay content background to black */
+        color: white;
+        padding: 20px;
+        border-radius: 10px;
+        width: 400px;
+        text-align: center;
+        box-shadow: 0 0 10px rgba(255, 215, 0, 0.5);
+        animation: slideDown 0.3s ease-in-out;
+        position: relative;
+      }
+
+      .checkbox-group {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        /*gap: 1rem; */
+      }
+
+      .checkbox-group label {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+      }
+
+      .checkbox-group input {
+        margin-right: 0.5rem;
+      }
+
+      .close-btn {
+        position: absolute;
+        top: 10px;
+        right: 15px;
+        font-size: 24px;
+        cursor: pointer;
+        color: white;
+      }
+
+      #dinkan label {
+        align-items: center;
+      }
+
+      @keyframes fadeIn {
+        from {
+          opacity: 0;
+        }
+        to {
+          opacity: 1;
+        }
+      }
+
+      @keyframes slideDown {
+        from {
+          transform: translateY(-20px);
+          opacity: 0;
+        }
+        to {
+          transform: translateY(0);
+          opacity: 1;
+        }
+      }
+
+      .radio-grid {
+        display: grid;
+        grid-template-columns: repeat(2, 1fr); /* 2 columns */
+        gap: 1rem; /* Space between items */
+        margin-top: 1rem; /* Optional spacing from above */
+      }
+
+      .radio-grid label {
+        display: flex;
+        align-items: center; /* Align radio and text */
+        gap: 0.5rem; /* Space between radio and label text */
+      }
+    </style>
+  </head>
+  <body>
+    <canvas id="particles"></canvas>
+
+    <header>
+      <img src="{% static 'image/logo.png' %}" alt="Logo" class="logo" />
+      <h1>Gesture-Controlled Presentations</h1>
+    </header>
+
+    <nav>
+      <a href="#upload">Upload</a>
+      <a href="#customization">Customization</a>
+      <a href="#tutorial">Tutorial</a>
+      <a href="#about">About Us</a>
+    </nav>
+
+    <main>
+      <form method="post" enctype="multipart/form-data">
+        {% csrf_token %}
+        <!-- Upload Section -->
+        <section id="upload" class="section">
+          <div class="section-content">
+            <h2>Upload Your Presentation</h2>
+            <p>
+              Select a PDF or PPT file to use in your gesture-controlled
+              presentation.
+            </p>
+            <div class="upload-container">
+              <input
+                type="file"
+                id="file-upload"
+                name="file"
+                style="display: none"
+              />
+              <label for="file-upload" class="btn">Choose File</label>
+              <br /><br />
+              <button class="btn" type="submit">Upload</button>
+            </div>
+          </div>
+        </section>
+
+        <!-- Customization Section -->
+        <section id="customization" class="section">
+          <div class="section-content">
+            <h2>Customization Options</h2>
+            <p>Choose how you want to control your presentation:</p>
+            <button type="button" onclick="openCustomization()" class="btn">
+              Customize Gestures
+            </button>
+          </div>
+        </section>
+        <!-- Gesture Customization Overlay -->
+        <div id="customizationOverlay" class="overlay">
+          <div class="overlay-content">
+            <span class="close-btn" onclick="closeCustomization()">×</span>
+            <h2>Customize Your Gestures</h2>
+            <form id="gestureForm">
+              <div class="gesture-container" style="display: flex">
+                <div>
+                  <label>Next</label>
+                </div>
+                <div class="checkbox-group">
+                  <input type="checkbox" name="next" value="0" />
+                  <input type="checkbox" name="next" value="0" />
+                  <input type="checkbox" name="next" value="0" />
+                  <input type="checkbox" name="next" value="0" />
+                  <input type="checkbox" name="next" value="1" checked />
+                </div>
+              </div>
+
+              <div class="gesture-container">
+                <label>Previous</label>
+                <div class="checkbox-group">
+                  <input type="checkbox" name="previous" value="1" checked />
+                  <input type="checkbox" name="previous" value="0" />
+                  <input type="checkbox" name="previous" value="0" />
+                  <input type="checkbox" name="previous" value="0" />
+                  <input type="checkbox" name="previous" value="0" />
+                </div>
+              </div>
+
+              <div class="gesture-container">
+                <label>Point</label>
+                <div class="checkbox-group">
+                  <input type="checkbox" name="point" value="0" />
+                  <input type="checkbox" name="point" value="1" checked />
+                  <input type="checkbox" name="point" value="0" />
+                  <input type="checkbox" name="point" value="0" />
+                  <input type="checkbox" name="point" value="0" />
+                </div>
+              </div>
+
+              <div class="gesture-container">
+                <label>Draw</label>
+                <div class="checkbox-group">
+                  <input type="checkbox" name="draw" value="1" checked />
+                  <input type="checkbox" name="draw" value="1" checked />
+                  <input type="checkbox" name="draw" value="0" />
+                  <input type="checkbox" name="draw" value="0" />
+                  <input type="checkbox" name="draw" value="0" />
+                </div>
+              </div>
+
+              <div class="gesture-container">
+                <label>Undo</label>
+                <div class="checkbox-group">
+                  <input type="checkbox" name="undo" value="0" />
+                  <input type="checkbox" name="undo" value="1" checked />
+                  <input type="checkbox" name="undo" value="1" checked />
+                  <input type="checkbox" name="undo" value="1" checked />
+                  <input type="checkbox" name="undo" value="0" />
+                </div>
+              </div>
+
+              <div class="checkbox-group" id="dinkan">
+                <div class="camera-container">
+                  <label style="text-align: center;"
+                    >Camera On/Off
+                    <input
+                      type="checkbox"
+                      id="checkbox1"
+                      onclick="updateValues()"
+                      checked
+                    />
+                  </label>
+                </div>
+                <div class="camera-container">
+                  <label style="text-align: center">
+                    Camera<br />position</label
+                  >
+                  <div class="radio-grid">
+                    <label>
+                      <input
+                        type="radio"
+                        name="group"
+                        value="1"
+                        onclick="updateValues()"
+                        checked
+                      />
+                      Top<br />Left
+                    </label>
+
+                    <label>
+                      <input
+                        type="radio"
+                        name="group"
+                        value="2"
+                        onclick="updateValues()"
+                      />
+                      Top<br />Right
+                    </label>
+
+                    <label>
+                      <input
+                        type="radio"
+                        name="group"
+                        value="3"
+                        onclick="updateValues()"
+                      />
+                      Bottom<br />Left
+                    </label>
+
+                    <label>
+                      <input
+                        type="radio"
+                        name="group"
+                        value="4"
+                        onclick="updateValues()"
+                      />
+                      Bottom<br />Right
+                    </label>
+                  </div>
+                </div>
+              </div>
+
+              <button type="button" onclick="sendGestures()" class="btn">
+                Save Gestures
+              </button>
+            </form>
+          </div>
+        </div>
+
+        <!-- Tutorial Section -->
+        <section id="tutorial" class="section">
+          <div class="section-content">
+            <h2>How to Use Hand Gestures</h2>
+            <p>Follow these steps to get started:</p>
+            <ol>
+              <li>Upload your presentation file.</li>
+              <li>Configure gestures to control slides.</li>
+              <li>Run the application and start presenting!</li>
+            </ol>
+            <p>
+              <a
+                href="https://youtu.be/36o-jrgsX_4?si=-eY8JJ0EjuK9ohPu&t=79"
+                class="btn"
+                >Watch Tutorial Video</a
+              >
+            </p>
+          </div>
+        </section>
+
+        <!-- About Us Section -->
+        <section id="about" class="section">
+          <div class="section-content">
+            <h2>About Us</h2>
+            <p>
+              We are a team of tech enthusiasts passionate about making
+              presentations smarter and more interactive. Our gesture-control
+              technology is designed to give you the freedom to focus on your
+              audience without worrying about manual controls.
+            </p>
+          </div>
+        </section>
+      </form>
+      <!-- Content sections remain unchanged -->
+    </main>
+
+    <footer>
+      <p>&copy; 2024 Hand Gesture Controller. All rights reserved.</p>
+    </footer>
+
+    <script>
+      function updateValues() {
+        // Initialize array with 0s
+        let values = [0, 0, 0, 0, 0];
+
+        // Set value for the independent checkbox
+        if (document.getElementById("checkbox1").checked) {
+          values[0] = 1;
+        }
+
+        // Find which radio is checked in the group
+        const groupRadios = document.getElementsByName("group");
+        for (let i = 0; i < groupRadios.length; i++) {
+          if (groupRadios[i].checked) {
+            values[i + 1] = 1; // Adjusting the index for group
+          }
+        }
+
+        return values;
+      }
+      function openCustomization() {
+        let overlay = document.getElementById("customizationOverlay");
+        overlay.style.display = "flex";
+        console.log("Overlay opened"); // Debugging message
+      }
+
+      function closeCustomization() {
+        let overlay = document.getElementById("customizationOverlay");
+        overlay.style.display = "none";
+        console.log("Overlay closed"); // Debugging message
+      }
+
+      function sendGestures() {
+        let gestures = {};
+        let gestureNames = ["next", "previous", "point", "draw", "undo"];
+
+        document.querySelectorAll(".gesture-container").forEach((container) => {
+          let gestureName = container
+            .querySelector("label")
+            .innerText.toLowerCase();
+          let values = Array.from(container.querySelectorAll("input")).map(
+            (input) => (input.checked ? 1 : 0)
+          );
+          gestures[gestureName] = values;
+        });
+
+        // Check for duplicate gestures in the first 5
+        let gestureValues = gestureNames.map((name) =>
+          JSON.stringify(gestures[name] || [])
+        );
+
+        let duplicates = gestureValues.some(
+          (value, index, arr) => arr.indexOf(value) !== index
+        );
+
+        if (duplicates) {
+          alert("Customization error: Two or more gestures are the same.");
+          return false;
+        }
+
+        // Hide overlay
+        let overlay = document.getElementById("customizationOverlay");
+        overlay.style.display = "none";
+
+        // Collect checkbox values
+        const checkboxValues = updateValues();
+        gestures["checkbox_values"] = checkboxValues;
+
+        // Send gestures to backend
+        fetch("/api/save-gestures/", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(gestures),
+        })
+          .then((response) => response.json())
+          .then((data) => alert("Gestures saved successfully!"))
+          .catch((error) => alert("Failed to save gestures."));
+
+        return false;
+      }
+
+      const particlesCanvas = document.getElementById("particles");
+      const ctx = particlesCanvas.getContext("2d");
+
+      const resizeCanvas = () => {
+        particlesCanvas.width = window.innerWidth;
+        particlesCanvas.height = window.innerHeight;
+      };
+      resizeCanvas();
+      window.addEventListener("resize", resizeCanvas);
+
+      const particles = [];
+      for (let i = 0; i < 100; i++) {
+        particles.push({
+          x: Math.random() * particlesCanvas.width,
+          y: Math.random() * particlesCanvas.height,
+          speedX: (Math.random() - 0.5) * 1.5,
+          speedY: (Math.random() - 0.5) * 1.5,
+          size: Math.random() * 3 + 1,
+        });
+      }
+
+      const animateParticles = () => {
+        ctx.clearRect(0, 0, particlesCanvas.width, particlesCanvas.height);
+        particles.forEach((p) => {
+          p.x += p.speedX;
+          p.y += p.speedY;
+
+          if (p.x < 0) p.x = particlesCanvas.width;
+          if (p.x > particlesCanvas.width) p.x = 0;
+          if (p.y < 0) p.y = particlesCanvas.height;
+          if (p.y > particlesCanvas.height) p.y = 0;
+
+          ctx.beginPath();
+          ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+          ctx.fillStyle = "#FFD700";
+          ctx.fill();
+          ctx.closePath();
+        });
+        requestAnimationFrame(animateParticles);
+      };
+      animateParticles();
+    </script>
+  </body>
+</html>

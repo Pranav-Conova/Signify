@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Slide Viewer</title>
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&family=Press+Start+2P&display=swap');
+        body {
+            margin: 0;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            background-color: black;
+            overflow: hidden;
+        }
+        img {
+            width: 100vw;
+            height: 100vh;
+            object-fit: cover;
+        }
+        .btn, .bttn {
+            position: absolute;
+            display: inline-block;
+            font-family: 'Press Start 2P', cursive;
+            background: linear-gradient(to right, #FFD700, #FF4500);
+            color: #000;
+            padding: 1rem 2rem;
+            border: none;
+            border-radius: 25px;
+            cursor: pointer;
+            font-size: 1rem;
+            text-align: center;
+            text-transform: uppercase;
+            transition: opacity 0.5s, transform 0.3s, box-shadow 0.3s;
+            opacity: 0;
+        }
+        .btn { top: 10px; right: 10px; }
+        .bttn { bottom: 10px; right: 10px; }
+
+        .btn:hover, .bttn:hover {
+            transform: scale(1.1);
+            box-shadow: 0 6px 15px rgba(255, 69, 0, 0.7);
+        }
+
+        .visible { opacity: 1; }
+    </style>
+</head>
+<body>
+    <video id="camera" autoplay playsinline hidden></video>
+    <canvas id="canvas" hidden></canvas>
+    <img id="slideImage" alt="Current Slide" />
+
+    <button onclick="window.history.back()" class="btn" id="back-button">Back</button>
+    <button id="fullscreen-button" class="bttn"><i class="material-icons">&#xe5d0;</i></button>
+
+    <script>
+        const fullscreenButton = document.getElementById('fullscreen-button');
+        const backButton = document.getElementById('back-button');
+        let hideTimeout;
+
+        function showControls() {
+            backButton.classList.add('visible');
+            fullscreenButton.classList.add('visible');
+            clearTimeout(hideTimeout);
+            hideTimeout = setTimeout(() => {
+                backButton.classList.remove('visible');
+                fullscreenButton.classList.remove('visible');
+            }, 2000);
+        }
+
+        document.addEventListener('mousemove', showControls);
+
+        fullscreenButton.addEventListener('click', () => {
+            if (!document.fullscreenElement) {
+                document.documentElement.requestFullscreen().catch(err => {
+                    alert(`Error attempting to enable fullscreen mode: ${err.message}`);
+                });
+            } else {
+                document.exitFullscreen();
+            }
+        });
+
+        const video = document.getElementById('camera');
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+        const slideImage = document.getElementById('slideImage');
+        const ws = new WebSocket('ws://127.0.0.1:8000/ws/video/');
+
+        navigator.mediaDevices.getUserMedia({ video: true })
+            .then(stream => {
+                video.srcObject = stream;
+                video.play();
+            })
+            .catch(err => console.error('Camera access denied:', err));
+
+        ws.onopen = () => {
+            console.log('WebSocket connected.');
+            setInterval(() => {
+                if (video.readyState === video.HAVE_ENOUGH_DATA) {
+                    canvas.width = video.videoWidth;
+                    canvas.height = video.videoHeight;
+                    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+                    canvas.toBlob(blob => {
+                        if (blob) {
+                            blob.arrayBuffer().then(buffer => {
+                                ws.send(buffer);
+                            });
+                        }
+                    }, 'image/jpeg');
+                }
+            }, 100);
+        };
+
+        ws.onmessage = event => {
+            const blob = new Blob([event.data], { type: 'image/jpeg' });
+            const imgUrl = URL.createObjectURL(blob);
+            slideImage.src = imgUrl;
+        };
+
+        ws.onclose = () => console.log('WebSocket closed.');
+        ws.onerror = error => console.error('WebSocket error:', error);
+
+        // Ensure controls show initially
+        showControls();
+    </script>
+</body>
+</html>

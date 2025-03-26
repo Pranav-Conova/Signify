@@ -1,0 +1,40 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Python Debugger: Current File with Arguments",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "${file}",
+      "console": "integratedTerminal",
+      "args": [
+        "${command:pickArgs}"
+      ]
+    },
+    {
+      "name": "Daphne ASGI Server",
+      "type": "python",
+      "request": "launch",
+      "program": "${workspaceFolder}/manage.py",
+      "args": [
+        "runserver"
+      ],
+      "django": true,
+      "justMyCode": false
+    },
+    {
+      "name": "Daphne WebSocket Server",
+      "type": "python",
+      "request": "launch",
+      "module": "daphne",
+      "args": [
+        "-b",
+        "127.0.0.1",
+        "-p",
+        "8000",
+        "video_processing.asgi:application"
+      ],
+      "console": "integratedTerminal"
+    }
+  ]
+}
