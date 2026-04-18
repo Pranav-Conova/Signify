@@ -1,0 +1,13 @@
+django>=4.2,<5.0
+daphne>=4.0
+channels>=4.0
+channels-redis>=4.1
+dj-database-url>=2.1
+psycopg2-binary>=2.9
+whitenoise>=6.5
+gunicorn>=21.2
+PyMuPDF>=1.23
+opencv-python-headless>=4.8
+cvzone>=1.6
+mediapipe>=0.10
+numpy>=1.24

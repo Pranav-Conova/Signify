@@ -1,0 +1,28 @@
+databases:
+  - name: signify-db
+    plan: free
+    databaseName: signify
+    user: signify
+
+services:
+  - type: web
+    name: signify
+    runtime: python
+    plan: free
+    buildCommand: |
+      pip install -r requirements.txt &&
+      apt-get update && apt-get install -y libreoffice &&
+      python manage.py collectstatic --noinput &&
+      python manage.py migrate
+    startCommand: daphne -b 0.0.0.0 -p $PORT video_processing.asgi:application
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: signify-db
+          property: connectionString
+      - key: DJANGO_SECRET_KEY
+        generateValue: true
+      - key: DEBUG
+        value: "False"
+      - key: PYTHON_VERSION
+        value: "3.11.6"

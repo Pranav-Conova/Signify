@@ -3,8 +3,12 @@ import cv2
 import numpy as np
 import os
 import time
+import logging
 from channels.generic.websocket import AsyncWebsocketConsumer
 from cvzone.HandTrackingModule import HandDetector
+
+logger = logging.getLogger(__name__)
+
 
 class VideoConsumer(AsyncWebsocketConsumer):
     def __init__(self, *args, **kwargs):
@@ -12,8 +16,10 @@ class VideoConsumer(AsyncWebsocketConsumer):
         self.presentation_path = ""
         self.current_slide_index = 0
         self.slide = None
+        self._cached_slide_index = -1  # Track which slide is cached
+        self._cached_slide_image = None  # Cached original slide (before annotations)
         self.detector = HandDetector(detectionCon=0.8, maxHands=1)
-        self.annotations = []  # Stores multiple drawings as separate lists
+        self.annotations = []
         self.last_gesture_time = time.time()
         self.gesture_cooldown = 1.0
         self.last_pointer_position = (640, 360)
@@ -23,11 +29,10 @@ class VideoConsumer(AsyncWebsocketConsumer):
         self.slide_height = 720
         self.pointer_active = False
         self.drawing_active = False
-        self.text_visible = False 
-        # Toggle text visibility
+        self.text_visible = False
 
         # Green line position (y-coordinate)
-        self.green_line_y = int(self.frame_height * 0.75)  # 75% from the top
+        self.green_line_y = int(self.frame_height * 0.75)
 
         # Default gesture mappings
         self.default_gestures = {
@@ -37,7 +42,7 @@ class VideoConsumer(AsyncWebsocketConsumer):
             "draw": [1, 1, 0, 0, 0],
             "undo": [0, 1, 1, 1, 0],
             "toggle_text": [0, 1, 1, 0, 1],
-            "checkbox_values" :[1,1,0,0,0]
+            "checkbox_values": [1, 1, 0, 0, 0]
         }
 
     async def connect(self):
@@ -54,11 +59,11 @@ class VideoConsumer(AsyncWebsocketConsumer):
         self.camera = gesture_config.get("checkbox_values", self.default_gestures["checkbox_values"])
 
         await self.accept()
-        print("WebSocket connected. Presentation Path:", self.presentation_path)
+        logger.info(f"WebSocket connected. Presentation Path: {self.presentation_path}")
         await self.send_current_slide()
 
     async def disconnect(self, close_code):
-        print("WebSocket disconnected.")
+        logger.info("WebSocket disconnected.")
 
     async def receive(self, text_data=None, bytes_data=None):
         if bytes_data:
@@ -78,64 +83,51 @@ class VideoConsumer(AsyncWebsocketConsumer):
             hands, frame = self.detector.findHands(frame, draw=True)
 
             if hands:
-                # Check if the hand is above the green line
-                hand_landmark = hands[0]['lmList'][0]  # Palm base landmark
+                hand_landmark = hands[0]['lmList'][0]
                 if hand_landmark[1] > self.green_line_y:
-                    print("Hand detected below the green line. Ignoring gesture.")
                     return
 
                 fingers = self.detector.fingersUp(hands[0])
                 current_time = time.time()
 
                 if current_time - self.last_gesture_time > self.gesture_cooldown:
-                    if fingers == self.point_gesture:  # Move pointer
+                    if fingers == self.point_gesture:
                         self.pointer_active = True
                         self.drawing_active = False
 
-                    elif fingers == self.draw_gesture:  # Start new drawing
+                    elif fingers == self.draw_gesture:
                         if not self.drawing_active:
                             self.drawing_active = True
-                            self.annotations.append([])  # New drawing list
+                            self.annotations.append([])
 
-                    elif self.drawing_active:  # If drawing stops
+                    elif self.drawing_active:
                         self.drawing_active = False
 
-                    elif fingers == self.undo_gesture:  # Undo last drawing
+                    elif fingers == self.undo_gesture:
                         if self.annotations:
                             self.annotations.pop()
-                            print("Undo last drawing")
 
-                    elif fingers == self.toggle_text_gesture:  # Toggle text visibility
+                    elif fingers == self.toggle_text_gesture:
                         self.text_visible = not self.text_visible
-                        print("Toggled text display")
 
                     else:
                         self.pointer_active = False
 
-                    if fingers == self.next_gesture:  # Next slide
+                    if fingers == self.next_gesture:
                         await self.next_slide()
 
-                    elif fingers == self.previous_gesture:  # Previous slide
+                    elif fingers == self.previous_gesture:
                         await self.previous_slide()
 
                     self.last_gesture_time = current_time
 
-                lm = hands[0]['lmList'][8]  # Index fingertip
+                lm = hands[0]['lmList'][8]
 
-                # Calculate z-distance (depth) for dynamic scaling
-                z_distance = abs(hands[0]['lmList'][0][2] - hands[0]['lmList'][8][2])  # Palm base to index tip
-
-                # Adjust scaling factor to cover the entire slide
                 scaling_factor_x = 3
                 scaling_factor_y = 2
 
-                # Map hand position to slide coordinates
-                scaled_x = int(lm[0] * scaling_factor_x)
-                scaled_y = int(lm[1] * scaling_factor_y)
-
-                # Ensure the pointer stays within slide boundaries
-                scaled_x = min(max(scaled_x, 0), self.slide_width - 1)
-                scaled_y = min(max(scaled_y, 0), self.slide_height - 1)
+                scaled_x = min(max(int(lm[0] * scaling_factor_x), 0), self.slide_width - 1)
+                scaled_y = min(max(int(lm[1] * scaling_factor_y), 0), self.slide_height - 1)
 
                 if self.drawing_active:
                     if not self.annotations[-1]:
@@ -152,40 +144,52 @@ class VideoConsumer(AsyncWebsocketConsumer):
 
             await self.send_current_slide(frame)
 
-    async def send_current_slide(self, frame=None):
+    def _load_slide(self):
+        """Load and cache the slide image. Only reads from disk when slide changes."""
+        if self._cached_slide_index == self.current_slide_index and self._cached_slide_image is not None:
+            return self._cached_slide_image.copy()
+
         slide_path = os.path.join(self.presentation_path, f"slide_{self.current_slide_index + 1}.png")
         if os.path.exists(slide_path):
-            self.slide = cv2.imread(slide_path)
-            
-            self.slide = cv2.resize(self.slide, (self.slide_width, self.slide_height))
+            img = cv2.imread(slide_path)
+            img = cv2.resize(img, (self.slide_width, self.slide_height))
+            self._cached_slide_index = self.current_slide_index
+            self._cached_slide_image = img
+            return img.copy()
+        return None
 
-            if frame is not None and self.camera[0] == 1:
-                frame_resized = cv2.resize(frame, (200, 150))
-                camera_height, camera_width = frame_resized.shape[:2]
-                # Positioning based on camera list values
-                if self.camera[1] == 1:  # Top-left
-                    self.slide[10:160, 10:210] = frame_resized
-                elif self.camera[2] == 1:  # Top-right
-                    self.slide[10:160, self.slide_width - 210:self.slide_width - 10] = frame_resized
-                elif self.camera[3] == 1:  # Bottom-left
-                    self.slide[self.slide_height - 160:self.slide_height - 10, 10:210] = frame_resized
-                elif self.camera[4] == 1:  # Bottom-right (Fixed alignment here)
-                    self.slide[self.slide_height - 10 - camera_height:self.slide_height - 10,
-                            self.slide_width - 10 - camera_width:self.slide_width - 10] = frame_resized
+    async def send_current_slide(self, frame=None):
+        self.slide = self._load_slide()
+        if self.slide is None:
+            return
 
-            for drawing in self.annotations:
-                for i in range(1, len(drawing)):
-                    cv2.line(self.slide, drawing[i - 1], drawing[i], (0, 0, 255), 5)
+        if frame is not None and self.camera[0] == 1:
+            frame_resized = cv2.resize(frame, (200, 150))
+            camera_height, camera_width = frame_resized.shape[:2]
+            if self.camera[1] == 1:
+                self.slide[10:160, 10:210] = frame_resized
+            elif self.camera[2] == 1:
+                self.slide[10:160, self.slide_width - 210:self.slide_width - 10] = frame_resized
+            elif self.camera[3] == 1:
+                self.slide[self.slide_height - 160:self.slide_height - 10, 10:210] = frame_resized
+            elif self.camera[4] == 1:
+                self.slide[self.slide_height - 10 - camera_height:self.slide_height - 10,
+                           self.slide_width - 10 - camera_width:self.slide_width - 10] = frame_resized
 
-            if self.pointer_active:
-                cv2.circle(self.slide, self.last_pointer_position, 10, (0, 255, 0), -1)
+        for drawing in self.annotations:
+            for i in range(1, len(drawing)):
+                cv2.line(self.slide, drawing[i - 1], drawing[i], (0, 0, 255), 5)
 
-            if self.text_visible:
-                cv2.putText(self.slide, "NAMASKARAM", (self.slide_width // 2 - 100, self.slide_height // 2),
-                            cv2.FONT_HERSHEY_SIMPLEX, 5, (0, 0, 255), 12, cv2.LINE_AA)
+        if self.pointer_active:
+            cv2.circle(self.slide, self.last_pointer_position, 10, (0, 255, 0), -1)
 
-            _, encoded_slide = cv2.imencode('.png', self.slide)
-            await self.send(bytes_data=encoded_slide.tobytes())
+        if self.text_visible:
+            cv2.putText(self.slide, "NAMASKARAM", (self.slide_width // 2 - 100, self.slide_height // 2),
+                        cv2.FONT_HERSHEY_SIMPLEX, 5, (0, 0, 255), 12, cv2.LINE_AA)
+
+        # Use JPEG encoding for faster real-time streaming
+        _, encoded_slide = cv2.imencode('.jpg', self.slide, [cv2.IMWRITE_JPEG_QUALITY, 85])
+        await self.send(bytes_data=encoded_slide.tobytes())
 
     async def next_slide(self):
         if self.current_slide_index + 1 < self.get_slide_count():
@@ -200,4 +204,6 @@ class VideoConsumer(AsyncWebsocketConsumer):
             await self.send_current_slide()
 
     def get_slide_count(self):
+        if not self.presentation_path or not os.path.exists(self.presentation_path):
+            return 0
         return len([f for f in os.listdir(self.presentation_path) if f.endswith('.png')])
